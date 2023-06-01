@@ -1,0 +1,10 @@
+[workspace]
+members = [
+  "plonk",
+  "rescue",
+  "primitives",
+  "utilities",
+  "utilities_derive",
+  "zprice",
+  "prover_single_gpu",
+]
