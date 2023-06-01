@@ -1,5 +1,5 @@
-// use ark_bls12_381::Bls12_381;
-use ark_bn254::Bn254;
+use ark_bls12_381::Bls12_381;
+// use ark_Bls12_381::Bls12_381;
 use ark_serialize::{CanonicalDeserialize, CanonicalSerialize};
 use ark_std::{
     boxed::Box,
@@ -17,7 +17,7 @@ use ark_ec::{
     twisted_edwards_extended::{GroupAffine, GroupProjective},
     AffineCurve, ModelParameters, ProjectiveCurve, TEModelParameters as Parameters,
 };
-use ark_ed_on_bn254::EdwardsParameters as Param254;
+use ark_ed_on_bls12_381::EdwardsParameters as Param381;
 
 const DEFAULT_UNIVERSAL_SRS_FILENAME: &str = "srs";
 const DEFAULT_PROVING_KEY_FILENAME: &str = "pk";
@@ -27,7 +27,7 @@ const DEFAULT_VERIFICATION_KEY_FILENAME: &str = "vk";
 pub fn store_srs(max_degree: usize, dest: Option<PathBuf>) {
     let mut rng = rand::thread_rng();
     let universal_param =
-        PlonkKzgSnark::<Bn254>::universal_setup(max_degree, &mut rng).unwrap();
+        PlonkKzgSnark::<Bls12_381>::universal_setup(max_degree, &mut rng).unwrap();
     let dest = match dest {
         Some(dest) => dest,
         None => default_path(DEFAULT_UNIVERSAL_SRS_FILENAME, "bin"),
@@ -43,7 +43,7 @@ pub fn store_srs(max_degree: usize, dest: Option<PathBuf>) {
 }
 
 /// Load universal parameter from a file.
-pub fn load_srs(src: Option<PathBuf>) -> Box<UniversalSrs<Bn254>> {
+pub fn load_srs(src: Option<PathBuf>) -> Box<UniversalSrs<Bls12_381>> {
     let src = match src {
         Some(src) => src,
         None => default_path(DEFAULT_UNIVERSAL_SRS_FILENAME, "bin"),
@@ -109,7 +109,7 @@ where
 
 /// Create and store SNARK proving key in a file.
 pub fn store_proving_and_verification_key(
-    srs: Box<UniversalSrs<Bn254>>,
+    srs: Box<UniversalSrs<Bls12_381>>,
     pk_dest: Option<PathBuf>,
     vk_dest: Option<PathBuf>,
 ) {
@@ -126,8 +126,8 @@ pub fn store_proving_and_verification_key(
 
     // invoke preprocessing to get proving key and verification key
     // let circuit = crate::generate_circuit(&mut rng).unwrap();
-    let circuit = gen_circuit_for_bench::<_, Param254>().unwrap();
-    let (pk, vk) = PlonkKzgSnark::<Bn254>::preprocess(&srs, &circuit).unwrap();
+    let circuit = gen_circuit_for_bench::<_, Param381>().unwrap();
+    let (pk, vk) = PlonkKzgSnark::<Bls12_381>::preprocess(&srs, &circuit).unwrap();
 
     // storing proving key
     let now = Instant::now();
@@ -146,7 +146,7 @@ pub fn store_proving_and_verification_key(
 }
 
 /// Load SNARK proving key from a file.
-pub fn load_proving_key(src: Option<PathBuf>) -> Box<ProvingKey<'static, Bn254>> {
+pub fn load_proving_key(src: Option<PathBuf>) -> Box<ProvingKey<'static, Bls12_381>> {
     let src = match src {
         Some(src) => src,
         None => default_path(DEFAULT_PROVING_KEY_FILENAME, "bin"),
@@ -160,7 +160,7 @@ pub fn load_proving_key(src: Option<PathBuf>) -> Box<ProvingKey<'static, Bn254>>
 }
 
 /// Load SNARK verification key from a file.
-pub fn load_verification_key(src: Option<PathBuf>) -> VerifyingKey<Bn254> {
+pub fn load_verification_key(src: Option<PathBuf>) -> VerifyingKey<Bls12_381> {
     let src = match src {
         Some(src) => src,
         None => default_path(DEFAULT_VERIFICATION_KEY_FILENAME, "bin"),

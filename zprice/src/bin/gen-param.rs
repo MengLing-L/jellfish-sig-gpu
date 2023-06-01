@@ -1,12 +1,10 @@
 
-use ark_bn254::{Bn254, FrParameters,Fr};
-use ark_ff::Fp256;
-use ark_std::rand::{CryptoRng, RngCore};
+use ark_bls12_381::{Fr};
 use jf_plonk::{prelude::*, errors::CircuitError, circuit::Variable};
 use jf_primitives::{signatures::schnorr::{VerKey, Signature, KeyPair}, circuit::signature::schnorr::SignatureGadget, constants::CS_ID_SCHNORR};
 use jf_rescue::RescueParameter;
-
-use ark_ed_on_bn254::EdwardsParameters as Param254;
+use ark_ed_on_bls12_381::EdwardsParameters as Param381;
+// use ark_ed_on_bn254::EdwardsParameters as Param254;
 use ark_ec::{
     group::Group,
     twisted_edwards_extended::{GroupAffine, GroupProjective},
@@ -62,8 +60,10 @@ where
 fn main() {
     let mut rng = rand::thread_rng();
     // let circuit = jf_zprice::generate_circuit(&mut rng).unwrap();
-    let circuit: PlonkCircuit<Fr> = gen_circuit_for_bench::<_, Param254>().unwrap();
+    let circuit: PlonkCircuit<Fr> = gen_circuit_for_bench::<_, Param381>().unwrap();
     let max_degree = circuit.srs_size().unwrap();
+
+    println!("{:?}",max_degree);
 
     // store SRS
     jf_zprice::store_srs(max_degree, None);

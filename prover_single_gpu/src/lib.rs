@@ -1,6 +1,5 @@
 pub mod gpu;
-use ark_bn254::{Bn254, Fr, G1Affine, G1Projective};
-// use ark_bls12_381::{Bls12_381, };
+use ark_bls12_381::{Bls12_381, Fr, G1Affine, G1Projective};
 use ark_ff::{FftField, Field, One, PrimeField, Zero};
 use ark_poly::{
     univariate::DensePolynomial, EvaluationDomain, Polynomial, Radix2EvaluationDomain, UVPolynomial,
@@ -21,16 +20,20 @@ use jf_plonk::{
 };
 use rayon::prelude::*;
 
+use rust_gpu_tools::{cuda, program_closures, Device, GPUError, LocalBuffer, Program};
+
 use ark_ec::{
-    short_weierstrass_jacobian::GroupAffine, PairingEngine, SWModelParameters as SWParam,
+    short_weierstrass_jacobian::GroupAffine, PairingEngine, SWModelParameters as SWParam, bn::Bn,
 };
 use ark_poly_commit::kzg10::Commitment;
 use gpu::{threadpool::Worker, MultiKernel};
 use jf_utils::to_bytes;
 use merlin::Transcript;
 
+use crate::gpu::SingleKernel;
+
 struct Context {
-    kernel: MultiKernel,
+    kernel: SingleKernel,
     pool: Worker,
 }
 
@@ -169,8 +172,8 @@ impl Prover {
     pub fn prove<C, R>(
         prng: &mut R,
         circuit: &C,
-        prove_key: &ProvingKey<Bn254>,
-    ) -> Result<Proof<Bn254>, PlonkError>
+        prove_key: &ProvingKey<Bls12_381>,
+    ) -> Result<Proof<Bls12_381>, PlonkError>
     where
         C: Arithmetization<Fr>,
         R: CryptoRng + RngCore,
@@ -179,7 +182,7 @@ impl Prover {
         let circuit = unsafe { &mut *(circuit as *const _ as *mut FakePlonkCircuit<Fr>) };
 
         let ctx = &mut Context {
-            kernel: MultiKernel::create(include_bytes!("./gpu/cl/lib.fatbin")),
+            kernel: SingleKernel::create(include_bytes!("./gpu/cl/lib.fatbin"), Device::all()[0]),
             pool: Worker::new()
         };
 
@@ -229,12 +232,12 @@ impl Prover {
             })
             .collect::<Vec<_>>();
         transcript.append_commitments(b"witness_poly_comms", &wires_poly_comms)?;
-        println!("Round 1: {:.2?}", now.elapsed());
+        // println!("Round 1: {:.2?}", now.elapsed());
 
         // Round 2
         let now = Instant::now();
-        let beta = transcript.get_and_append_challenge::<Bn254>(b"beta")?;
-        let gamma = transcript.get_and_append_challenge::<Bn254>(b"gamma")?;
+        let beta = transcript.get_and_append_challenge::<Bls12_381>(b"beta")?;
+        let gamma = transcript.get_and_append_challenge::<Bls12_381>(b"gamma")?;
         let permutation_poly = {
             let mut product_vec = vec![Fr::one()];
             for j in 0..(n - 1) {
@@ -261,11 +264,11 @@ impl Prover {
             &permutation_poly,
         );
         transcript.append_commitment(b"perm_poly_comms", &prod_perm_poly_comm)?;
-        println!("Round 2: {:.2?}", now.elapsed());
+        // println!("Round 2: {:.2?}", now.elapsed());
 
         // Round 3
         let now = Instant::now();
-        let alpha = transcript.get_and_append_challenge::<Bn254>(b"alpha")?;
+        let alpha = transcript.get_and_append_challenge::<Bls12_381>(b"alpha")?;
         let alpha_square_div_n = alpha.square() / Fr::from(n as u64);
         let quotient_poly = {
             let tmp_domain = Radix2EvaluationDomain::<Fr>::new((n + 2) * 5).unwrap();
@@ -393,11 +396,11 @@ impl Prover {
             })
             .collect::<Vec<_>>();
         transcript.append_commitments(b"quot_poly_comms", &split_quot_poly_comms)?;
-        println!("Round 3: {:.2?}", now.elapsed());
+        // println!("Round 3: {:.2?}", now.elapsed());
 
         // Round 4
         let now = Instant::now();
-        let zeta = transcript.get_and_append_challenge::<Bn254>(b"zeta")?;
+        let zeta = transcript.get_and_append_challenge::<Bls12_381>(b"zeta")?;
         let wires_evals = wire_polys
             .par_iter()
             .map(|poly| poly.evaluate(&zeta))
@@ -409,12 +412,12 @@ impl Prover {
             .map(|poly| poly.evaluate(&zeta))
             .collect::<Vec<_>>();
         let perm_next_eval = permutation_poly.evaluate(&(zeta * domain.group_gen));
-        transcript.append_proof_evaluations::<Bn254>(
+        transcript.append_proof_evaluations::<Bls12_381>(
             &wires_evals,
             &wire_sigma_evals,
             &perm_next_eval,
         )?;
-        println!("Round 4: {:.2?}", now.elapsed());
+        // println!("Round 4: {:.2?}", now.elapsed());
 
         // Round 5
         let now = Instant::now();
@@ -484,7 +487,7 @@ impl Prover {
             }
             r_quot.mul(-vanish_eval)
         };
-        let v = transcript.get_and_append_challenge::<Bn254>(b"v")?;
+        let v = transcript.get_and_append_challenge::<Bls12_381>(b"v")?;
 
         let opening_proof = {
             // List the polynomials to be opened at point `zeta`.
@@ -529,7 +532,7 @@ impl Prover {
                 },
             )
         };
-        println!("Round 5: {:.2?}", now.elapsed());
+        // println!("Round 5: {:.2?}", now.elapsed());
 
         Ok(Proof {
             wires_poly_comms,
@@ -564,7 +567,7 @@ impl Prover {
     }
 
     #[inline]
-    fn commit_polynomial(ctx: &mut Context, ck: &[G1Affine], poly: &[Fr]) -> Commitment<Bn254> {
+    fn commit_polynomial(ctx: &mut Context, ck: &[G1Affine], poly: &[Fr]) -> Commitment<Bls12_381> {
         let mut plain_coeffs = poly.iter().map(|s| s.into_repr()).collect::<Vec<_>>();
 
         plain_coeffs.resize(ck.len(), Fr::zero().into_repr());
@@ -578,6 +581,6 @@ impl Prover {
         bases: &[G1Affine],
         exps: &[<Fr as PrimeField>::BigInt],
     ) -> G1Projective {
-        ctx.kernel.multiexp(&ctx.pool, bases, exps, 0)
+        ctx.kernel.multiexp(bases, exps)
     }
 }

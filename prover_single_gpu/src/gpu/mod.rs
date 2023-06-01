@@ -2,7 +2,8 @@ pub mod threadpool;
 
 use std::cmp;
 
-use ark_bn254::{Fr, G1Affine, G1Projective};
+use ark_bls12_381::{Bls12_381, Fr, G1Affine, G1Projective};
+// use ark_bls12_381::{Bls12_381};
 use ark_ec::ProjectiveCurve;
 use ark_ff::{Field, One, PrimeField, Zero};
 use rust_gpu_tools::{cuda, program_closures, Device, GPUError, LocalBuffer, Program};
@@ -59,7 +60,8 @@ pub struct SingleKernel {
 /// Calculates the maximum number of terms that can be put onto the GPU memory.
 fn calc_chunk_size(mem: u64, work_units: usize) -> usize {
     let aff_size = std::mem::size_of::<G1Affine>();
-    assert_eq!(aff_size, 104);
+    // let aff_size = 104;
+    // assert_eq!(aff_size, 104);
     let exp_size = exp_size();
     let proj_size = std::mem::size_of::<G1Projective>();
 

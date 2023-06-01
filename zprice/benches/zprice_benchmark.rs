@@ -1,7 +1,9 @@
 
 use std::time::Instant;
 
-use ark_bn254::{Bn254, FrParameters,Fr};
+// use ark_bn254::{G1Affine, G1Projective};
+// use ark_bn254::{Bn254, FrParameters,Fr};
+use ark_bls12_381::{Bls12_381, Fr};
 use ark_ff::Fp256;
 use ark_std::rand::{CryptoRng, RngCore};
 use criterion::{criterion_group, criterion_main, Criterion};
@@ -14,14 +16,15 @@ use ark_ec::{
     AffineCurve, ModelParameters, ProjectiveCurve, TEModelParameters as Parameters,
 };
 
-use ark_ed_on_bn254::EdwardsParameters as Param254;
+// use ark_ed_on_bn254::{EdwardsParameters as Param254};
+use ark_ed_on_bls12_381::EdwardsParameters as Param381;
 const NUM_REPETITIONS: usize = 50;
 
 fn prove<C, R>(
     rng: &mut R,
     circuit: &C,
-    prove_key: &ProvingKey<Bn254>,
-) -> Result<Proof<Bn254>, PlonkError>
+    prove_key: &ProvingKey<Bls12_381>,
+) -> Result<Proof<Bls12_381>, PlonkError>
 where
     C: Arithmetization<Fr>,
     R: CryptoRng + RngCore,
@@ -85,7 +88,7 @@ pub fn criterion_benchmark()
 
     // Build a circuit with randomly sampled satisfying assignments
     // let circuit = jf_zprice::generate_circuit(&mut rng).unwrap();
-    let circuit: PlonkCircuit<Fr> = gen_circuit_for_bench::<_, Param254>().unwrap();
+    let circuit: PlonkCircuit<Fr> = gen_circuit_for_bench::<_, Param381>().unwrap();
 
     // load pre-generated proving key and verification key from files
     let pk = jf_zprice::load_proving_key(None);
@@ -98,7 +101,7 @@ pub fn criterion_benchmark()
     }
 
     println!(
-        "{} times proving time for {}: {} ns",
+        "{} times GPU version proving time for {}: {} ns",
         // stringify!($bench_curve),
         NUM_REPETITIONS,
         "signature",
@@ -110,10 +113,10 @@ pub fn criterion_benchmark()
     let public_inputs = circuit.public_input().unwrap();
     let start = Instant::now();
     for _ in 0..NUM_REPETITIONS {
-        let _ =PlonkKzgSnark::<Bn254>::verify::<StandardTranscript>(&vk, &public_inputs, &proof,).unwrap();
+        let _ =PlonkKzgSnark::<Bls12_381>::verify::<StandardTranscript>(&vk, &public_inputs, &proof,).unwrap();
     }
     println!(
-        "{} times verifing time for {}: {} ns",
+        "{} times GPU version verifing time for {}: {} ns",
         // stringify!($bench_curve),
         NUM_REPETITIONS,
         "signature",
@@ -121,7 +124,7 @@ pub fn criterion_benchmark()
     );
 
     assert!(
-        PlonkKzgSnark::<Bn254>::verify::<StandardTranscript>(&vk, &public_inputs, &proof,)
+        PlonkKzgSnark::<Bls12_381>::verify::<StandardTranscript>(&vk, &public_inputs, &proof,)
             .is_ok()
     );
 
@@ -138,6 +141,8 @@ pub fn criterion_benchmark()
 // criterion_main!(benches);
 
 fn main() {
+    // println!("{:?}", std::mem::size_of::<G1Affine>());
+    // println!("{:?}", std::mem::size_of::<G1Projective>());
     criterion_benchmark();
     // bench_batch_verify();
 }
