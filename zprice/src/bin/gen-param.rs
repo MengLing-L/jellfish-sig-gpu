@@ -10,6 +10,7 @@ use ark_ec::{
     twisted_edwards_extended::{GroupAffine, GroupProjective},
     AffineCurve, ModelParameters, ProjectiveCurve, TEModelParameters as Parameters,
 };
+const NUM_REPETITIONS: usize = 50;
 pub fn build_verify_sig_circuit<F, P>(
     vk: &VerKey<P>,
     msg: &[F],
@@ -26,7 +27,9 @@ where
         .iter()
         .map(|m| circuit.create_variable(*m))
         .collect::<Result<Vec<_>, PlonkError>>().unwrap();
-    SignatureGadget::<F, P>::verify_signature(&mut circuit, &vk_var, &msg_var, &sig_var).unwrap();
+    for _ in 0..NUM_REPETITIONS {
+        SignatureGadget::<F, P>::verify_signature(&mut circuit, &vk_var, &msg_var, &sig_var).unwrap();
+    }
     Ok(circuit)
 }
 

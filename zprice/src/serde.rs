@@ -19,6 +19,8 @@ use ark_ec::{
 };
 use ark_ed_on_bls12_381::EdwardsParameters as Param381;
 
+use crate::NUM_REPETITIONS;
+
 const DEFAULT_UNIVERSAL_SRS_FILENAME: &str = "srs";
 const DEFAULT_PROVING_KEY_FILENAME: &str = "pk";
 const DEFAULT_VERIFICATION_KEY_FILENAME: &str = "vk";
@@ -58,7 +60,7 @@ pub fn load_srs(src: Option<PathBuf>) -> Box<UniversalSrs<Bls12_381>> {
     println!(" done in {} ms", now.elapsed().as_millis());
     Box::new(param)
 }
-
+// const NUM_REPETITIONS: usize = 100;
 pub fn build_verify_sig_circuit<F, P>(
     vk: &VerKey<P>,
     msg: &[F],
@@ -75,7 +77,9 @@ where
         .iter()
         .map(|m| circuit.create_variable(*m))
         .collect::<Result<Vec<_>, PlonkError>>().unwrap();
-    SignatureGadget::<F, P>::verify_signature(&mut circuit, &vk_var, &msg_var, &sig_var).unwrap();
+    for _ in 0..NUM_REPETITIONS {
+        SignatureGadget::<F, P>::verify_signature(&mut circuit, &vk_var, &msg_var, &sig_var).unwrap();
+    }
     Ok(circuit)
 }
 

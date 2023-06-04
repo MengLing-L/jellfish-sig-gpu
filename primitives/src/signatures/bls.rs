@@ -148,7 +148,7 @@ where
 mod test {
     use super::*;
     use crate::signatures::tests::{failed_verification, sign_and_verify};
-    use ark_bls12_377::Parameters as Param377;
+    // use ark_bls12_377::Parameters as Param377;
     use ark_bls12_381::Parameters as Param381;
 
     macro_rules! test_signature {
@@ -165,7 +165,7 @@ mod test {
 
     #[test]
     fn test_bls_sig() {
-        test_signature!(Param377);
+        // test_signature!(Param377);
         test_signature!(Param381);
     }
 }

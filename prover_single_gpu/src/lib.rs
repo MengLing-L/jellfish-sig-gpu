@@ -33,7 +33,7 @@ use merlin::Transcript;
 use crate::gpu::SingleKernel;
 
 struct Context {
-    kernel: SingleKernel,
+    kernel: MultiKernel,
     pool: Worker,
 }
 
@@ -182,7 +182,7 @@ impl Prover {
         let circuit = unsafe { &mut *(circuit as *const _ as *mut FakePlonkCircuit<Fr>) };
 
         let ctx = &mut Context {
-            kernel: SingleKernel::create(include_bytes!("./gpu/cl/lib.fatbin"), Device::all()[0]),
+            kernel: MultiKernel::create(include_bytes!("./gpu/cl/lib.fatbin")),
             pool: Worker::new()
         };
 
@@ -581,6 +581,6 @@ impl Prover {
         bases: &[G1Affine],
         exps: &[<Fr as PrimeField>::BigInt],
     ) -> G1Projective {
-        ctx.kernel.multiexp(bases, exps)
+        ctx.kernel.multiexp(&ctx.pool, bases, exps, 0)
     }
 }

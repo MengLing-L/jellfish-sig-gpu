@@ -18,7 +18,8 @@ use ark_ec::{
 
 // use ark_ed_on_bn254::{EdwardsParameters as Param254};
 use ark_ed_on_bls12_381::EdwardsParameters as Param381;
-const NUM_REPETITIONS: usize = 50;
+use jf_zprice::NUM_REPETITIONS;
+
 
 fn prove<C, R>(
     rng: &mut R,
@@ -30,8 +31,25 @@ where
     R: CryptoRng + RngCore,
 {
     // TODO: USE THIS DURING ACTUAL BENCHMARK
-    prover_single_gpu::Prover::prove(rng, circuit, &prove_key)
-    // PlonkKzgSnark::<Bls12_381>::prove::<_, _, StandardTranscript>(rng, circuit, &prove_key)
+    let start = Instant::now();
+    prover_single_gpu::Prover::prove(rng, circuit, &prove_key);
+    println!(
+        "{} times GPU version proving time for {}: {} ns",
+        // stringify!($bench_curve),
+        NUM_REPETITIONS,
+        "signature",
+        start.elapsed().as_nanos()  as u128
+    );
+    let start = Instant::now();
+    let proof = PlonkKzgSnark::<Bls12_381>::prove::<_, _, StandardTranscript>(rng, circuit, &prove_key);
+    println!(
+        "{} times proving time for {}: {} ns",
+        // stringify!($bench_curve),
+        NUM_REPETITIONS,
+        "signature",
+        start.elapsed().as_nanos()  as u128
+    );
+    proof
 }
 
 pub fn build_verify_sig_circuit<F, P>(
@@ -44,13 +62,16 @@ where
     P: Parameters<BaseField = F> + Clone,
 {
     let mut circuit = PlonkCircuit::<F>::new();
-    let vk_var = circuit.create_signature_vk_variable(vk).unwrap();
-    let sig_var = circuit.create_signature_variable(sig).unwrap();
-    let msg_var: Vec<Variable> = msg
+    
+        let vk_var = circuit.create_signature_vk_variable(vk).unwrap();
+        let sig_var = circuit.create_signature_variable(sig).unwrap();
+        let msg_var: Vec<Variable> = msg
         .iter()
         .map(|m| circuit.create_variable(*m))
         .collect::<Result<Vec<_>, PlonkError>>().unwrap();
-    SignatureGadget::<F, P>::verify_signature(&mut circuit, &vk_var, &msg_var, &sig_var).unwrap();
+    for _ in 0..NUM_REPETITIONS {
+        SignatureGadget::<F, P>::verify_signature(&mut circuit, &vk_var, &msg_var, &sig_var).unwrap();
+    }
     Ok(circuit)
 }
 
@@ -68,8 +89,12 @@ where
     msg_bad[0] = F::from(2 as u64);
     let sig = keypair.sign(&msg, CS_ID_SCHNORR);
     let sig_bad = keypair.sign(&msg_bad, CS_ID_SCHNORR);
+    let start = Instant::now();
     vk.verify(&msg, &sig, CS_ID_SCHNORR).unwrap();
-
+    println!(
+        "schnorr verify time : {} ns",
+        start.elapsed().as_nanos()  as u128
+    );
     // Test `verify_signature()`
     // Good path
     let mut circuit: PlonkCircuit<F> = build_verify_sig_circuit(vk, &msg, &sig)?;
@@ -89,6 +114,16 @@ pub fn criterion_benchmark()
     // Build a circuit with randomly sampled satisfying assignments
     // let circuit = jf_zprice::generate_circuit(&mut rng).unwrap();
     let circuit: PlonkCircuit<Fr> = gen_circuit_for_bench::<_, Param381>().unwrap();
+    let max_degree = circuit.srs_size().unwrap();
+
+    println!("{:?}",max_degree);
+
+    // store SRS
+    jf_zprice::store_srs(max_degree, None);
+
+    // store proving key and verification key
+    let srs = jf_zprice::load_srs(None);
+    jf_zprice::store_proving_and_verification_key(srs, None, None);
 
     // load pre-generated proving key and verification key from files
     let pk = jf_zprice::load_proving_key(None);
@@ -96,27 +131,40 @@ pub fn criterion_benchmark()
 
     // verify the proof against the public inputs.
     let start = Instant::now();
-    for _ in 0..NUM_REPETITIONS {
-        let _ = prove(&mut rng, &circuit, &pk).unwrap();
-    }
-
-    println!(
-        "{} times GPU version proving time for {}: {} ns",
-        // stringify!($bench_curve),
-        NUM_REPETITIONS,
-        "signature",
-        start.elapsed().as_nanos()  as u128
-    );
-
-
+    // for _ in 0..NUM_REPETITIONS {
+    //     let _ = prove(&mut rng, &circuit, &pk).unwrap();
+    // }
     let proof = prove(&mut rng, &circuit, &pk).unwrap();
+
+    // println!(
+    //     "proof.wires_poly_comms.len: {}",
+    //     proof.wires_poly_comms.len()
+    // );
+
+    // println!(
+    //     "proof.split_quot_poly_comms.len: {}",
+    //     proof.split_quot_poly_comms.len()
+    // );
+
+    // println!(
+    //     "proof.poly_evals.wires_evals.len: {}",
+    //     proof.poly_evals.wires_evals.len()
+    // );
+
+    // println!(
+    //     "{} times GPU version proving time for {}: {} ns",
+    //     // stringify!($bench_curve),
+    //     NUM_REPETITIONS,
+    //     "signature",
+    //     start.elapsed().as_nanos()  as u128
+    // );
     let public_inputs = circuit.public_input().unwrap();
     let start = Instant::now();
-    for _ in 0..NUM_REPETITIONS {
+    // for _ in 0..NUM_REPETITIONS {
         let _ =PlonkKzgSnark::<Bls12_381>::verify::<StandardTranscript>(&vk, &public_inputs, &proof,).unwrap();
-    }
+    // }
     println!(
-        "{} times GPU version verifing time for {}: {} ns",
+        "{} times verifying time for {}: {} ns",
         // stringify!($bench_curve),
         NUM_REPETITIONS,
         "signature",

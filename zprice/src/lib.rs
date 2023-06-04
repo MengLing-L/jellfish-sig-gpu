@@ -28,7 +28,8 @@ use jf_primitives::{
 pub const TREE_HEIGHT: u8 = 32;
 /// Number of memberships proofs to be verified in the circuit
 pub const NUM_MEMBERSHIP_PROOFS: usize = 640;
-
+/// Number of shonorr proofs to be verified in the circuit
+pub const NUM_REPETITIONS: usize = 200;
 /// generate a gigantic circuit (with random, satisfiable wire assignments)
 ///
 /// num_constraint = num_memebership_proof * (157 * tree_height + 149)
